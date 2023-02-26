@@ -24,10 +24,10 @@ void setup() {
   Serial.begin(9600);               // Скорость обмена данными с компьютером
   Serial.println("Start!");
   SIM800.begin(9600);               // Скорость обмена данными с модемом
-  SIM800.println("AT");
-
   Sim800l.begin();                                                       // инициализируем библиотеку
+  SIM800.println("AT");
   sending = Sim800l.sendSms(tel_number, sms_text);   // шлем сообщение
+  Serial.println(sending);
   Serial.println("Message sent");
 }
 

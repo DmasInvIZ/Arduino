@@ -6,23 +6,39 @@
   В перспективе подключение к SIM800L для отправки СМС на телефон
   - Подключение датчиков: пины 2-7
   - 7, 8 пины для подключения sim800l
-  - 9 пина - пищалка
+  - 11 пин - пищалка
 
   Нужно сделать:
   - одновременное мигание светодиода с названием зоны и работа сигнализации
 */
 
 #include <SoftwareSerial.h>
-//#include <LiquidCrystal_I2C.h>
+#include <Sim800l.h>
+#include <EncButton.h>
+#include "GyverButton.h"
 
-SoftwareSerial sim800l(8, 9); // 8 - RX Arduino (TX SIM800L), 9 - TX Arduino (RX SIM800L)
-//LiquidCrystal_I2C lcd(0x27,20,4);    // set the LCD address to 0x27 for a 16 chars and 2 line display
+#define buzz_pin 11                                           // пин сигналки   
+#define BTN_PIN 10                                            // кнопка
+#define SMStext "Alarm! Zone: "                               // текст смс на телефон
+#define tel_number "+375295689321"                            // номер телефона для отправки
+#define tel_number2 "+375257769952"                           // 2 номер телефона для отправки
+#define alarm_sec 2                                           // пищим столько раз (секунд)
 
-String SMStext = "Alarm! ";            // текст смс на телефон
-bool SMSflag = false;
+#define led_kitchen A0
+#define led_water_filter A1
+#define led_bath A2
+#define led_washer A3
+#define led_sewerage A4
 
-int buzz_pin = 9;
-unsigned long timer;
+GButton butt1(BTN_PIN);
+
+Sim800l Sim800l;
+SoftwareSerial SIM800(8, 9);                                  // 8 - RX Arduino (TX SIM800L), 9 - TX Arduino (RX SIM800L)
+
+//char* SMStext;
+//char* tel_number;
+//char* tel_number2;
+
 
 //имена зон конотроля
 int kitchen = 2;
@@ -31,79 +47,78 @@ int bath = 4;
 int washer1 = 5;
 int washer2 = 6;
 int sewerage = 7;
-int test_led = 13;
 
 void led_blink(int zone) {
   while (true) {
-    digitalWrite(zone, HIGH);
-    delay(300);
     digitalWrite(zone, LOW);
     delay(300);
-    }
+    digitalWrite(zone, HIGH);
+    delay(300);
   }
-
-void SendSMS(String SMStext_zone) {
-  Serial.println("Alarm! Sending SMS... " + SMStext_zone);  // Печать текста
-  sim800l.print("AT+CMGF=1\r");                             // Выбирает формат SMS
-  delay(100);
-  sim800l.print("AT+CMGS=\"+375295689321\"\r");             // Отправка СМС на указанный номер +792100000000"
-  delay(300);
-  sim800l.print(SMStext + SMStext_zone);                    // Тест сообщения
-  delay(300);
-  sim800l.print((char)26);                                  // (требуется в соответствии с таблицей данных)
-  delay(300);
-  sim800l.println();
-  Serial.println("Text Sent.");
-  SMSflag = true;                                           // поднимаем флаг, во избежание повторных смс
-  delay(500);
 }
 
-void alarm_on(int zone) {
-  led_blink(zone);                                        // включаем светодиод на панели для наглядности
-//  int alarm_counter = 0;
-//  while (alarm_counter != 6) {                              // столько будет пищать сигнализация
-//    digitalWrite(13, HIGH);
-//    delay(300);
-//    digitalWrite(13, LOW);
-//    delay(300);
-//    alarm_counter += 1;
-//  }
-  delay(1000);
+void SendSMS(String SMStext_zone) {
+  Sim800l.sendSms(tel_number, SMStext + SMStext_zone);
+  //Sim800l.sendSms(tel_number2, SMStext + SMStext_zone);
+  Serial.println("alarm message sent");
+}
+
+void alarm_on(int led, String zone) {
+  Serial.println("Alarm!");
+  Serial.println(led);
+  digitalWrite(led, HIGH);
+  int counter = alarm_sec;                                       // пищим столько раз (секунд)
+  while (counter > 0) {
+    digitalWrite(buzz_pin, HIGH);
+    delay(500);
+    digitalWrite(buzz_pin, LOW);
+    delay(500);
+    counter -= 1;
+  }
+  SendSMS(zone);
+  Serial.println("led blink");
+  led_blink(led);                                               // включаем светодиод на панели для наглядности
 }
 
 void setup() {
   Serial.begin(9600);                         // Инициализация последовательной связи с Arduino и Arduino IDE (Serial Monitor)
-  Serial.println("Загрузка...");
-  sim800l.begin(9600);                        // Инициализация последовательной связи с Arduino и SIM800L
-  delay(100);
-  //pinMode(buzz_pin, OUTPUT);
-  pinMode(13, OUTPUT);
+  Serial.println("Loading...");
+  SIM800.begin(9600);                         // Инициализация последовательной связи с Arduino и SIM800L
+  Sim800l.begin();                            // Инициализация модема
+  SIM800.println("AT");
+  pinMode(buzz_pin, OUTPUT);
+  pinMode(led_kitchen, OUTPUT);
+  pinMode(led_water_filter, OUTPUT);
+  pinMode(led_bath, OUTPUT);
+  pinMode(led_washer, OUTPUT);
+  pinMode(led_sewerage, OUTPUT);
+  pinMode(BTN_PIN, INPUT_PULLUP);             // пин кнопки с внутренней подтяжкой
   delay(1000);
-  Serial.println("Готово.");
-  //lcd.init();
-  //lcd.backlight();
+  Serial.println("Ready.");
 }
 
 void loop() {
   if (digitalRead(kitchen) == HIGH) {
-    if (SMSflag == false) {SendSMS("Zone: kitchen");}                 // если смс еще не отпарвлялось, то отправляем
-    alarm_on(test_led);
+    alarm_on(led_kitchen, "kitchen");                                    // led заменить на пин светодиода
   }
   if (digitalRead(water_filter) == HIGH) {
-    if (SMSflag == false) {SendSMS("Zone: kitchen, water filter");}
-    alarm_on(water_filter);
+    alarm_on(led_water_filter, "kitchen, water filter");
   }
   if (digitalRead(bath) == HIGH) {
-    if (SMSflag == false) {SendSMS("Zone: bathroom, under bath");}
-    alarm_on(bath);
+    alarm_on(led_bath, "bathroom, under bath");
   }
-  if (digitalRead(washer1) || digitalRead(washer2) == HIGH) {
-    if (SMSflag == false) {SendSMS("Zone: washing machine");}
-    alarm_on(washer1);
+  if (digitalRead(washer1) == HIGH || digitalRead(washer2) == HIGH) {
+    alarm_on(led_washer, "washing machine");
   }
   if (digitalRead(sewerage) == HIGH) {
-    if (SMSflag == false) {SendSMS("Zone: bathroom, behind the toilet");}
-    alarm_on(sewerage);
+    alarm_on(led_sewerage, "sewerage, bathroom, behind the toilet");
   }
-  delay(50);
+  butt1.tick();
+  if (butt1.isSingle()) {
+    Sim800l.sendSms(tel_number, "Test SMS, module OK");
+    Serial.println("send sms");                                    // по нажатию кнопки отправляем тестовое смс
+  }
+  if (Sim800l.available()) Serial.println("OK");
+  delay(30);
+  //Serial.println("Check");
 }
