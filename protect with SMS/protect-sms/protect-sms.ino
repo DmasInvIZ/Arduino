@@ -1,15 +1,19 @@
 /*
   Система сигнализации протечек.
-  Имеем 4 зоны контроля и 6 датчиков
+  Имеем 5 зон контроля и 6 датчиков
   Под мойкой в кухне, под фильтром в кухне, под ванной, 2 под стиральной машиной, 1 в стояке с коммуникациями
-  При срабатывании любого датчика включается сигнализация на 30 сек.
-  В перспективе подключение к SIM800L для отправки СМС на телефон
+  При срабатывании любого датчика включается сигнализация на 20 сек.
+  После того как обнаружена протечка включается пищалка, отсылается смс на указанные номера 
+  и мигает соответсвутющая лампочка.
+  Работа алгоритма прекращается до перезагрузки МК.
+
   - Подключение датчиков: пины 2-7
   - 7, 8 пины для подключения sim800l
   - 11 пин - пищалка
+  - A0-A5 - для светодиодов
 
-  Нужно сделать:
-  - одновременное мигание светодиода с названием зоны и работа сигнализации
+  В следующих версиях прошивки:
+  работы программы не останавливается после обнаружения протечки
 */
 
 #include <SoftwareSerial.h>
@@ -59,7 +63,7 @@ void led_blink(int zone) {
 
 void SendSMS(String SMStext_zone) {
   Sim800l.sendSms(tel_number, SMStext + SMStext_zone);
-  //Sim800l.sendSms(tel_number2, SMStext + SMStext_zone);
+  Sim800l.sendSms(tel_number2, SMStext + SMStext_zone);
   Serial.println("alarm message sent");
 }
 
@@ -116,9 +120,10 @@ void loop() {
   butt1.tick();
   if (butt1.isSingle()) {
     Sim800l.sendSms(tel_number, "Test SMS, module OK");
+    Sim800l.sendSms(tel_number2, "Test SMS, module OK");
     Serial.println("send sms");                                    // по нажатию кнопки отправляем тестовое смс
   }
-  if (Sim800l.available()) Serial.println("OK");
+  //if (Sim800l.available()) Serial.println("OK");
   delay(30);
   //Serial.println("Check");
 }
