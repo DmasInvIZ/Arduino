@@ -1,3 +1,8 @@
+/*
+ * Тест дисплея ардуино, подключается по I2C
+ * Ардуино A4 - дисплей SDA, ардуино A5 - дисплей SCL
+ */
+
 //#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
