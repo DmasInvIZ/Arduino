@@ -140,7 +140,7 @@ void loop() {
     alarm_on(led_sewerage, "Alarm! Zone: sewerage, bathroom, behind the toilet");
   }
   //butt1.tick();
-  enc.tick();  
+  enc.tick();
   //if (butt1.isSingle()) {
   if (enc.hasClicks()) {
     alarm_test();
