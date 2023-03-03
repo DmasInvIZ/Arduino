@@ -23,22 +23,24 @@ String textSms, numberSms;                    // текст смс и номер
 volatile bool isstarted; ////////////////////////
 unsigned long last_time;
 float temp, time_value;
-//float test_temp_val;
-bool is_started;
+String engine_status;                         // статус двигателя: switched-off - выключен
+                                              // engine-running - запущен
+                                              // starting-failed - запуск не удался
 
 void relay_off() {
   // реле управляется низким уровнем, при включении МК подаем высокий сигнал на пины
   digitalWrite(pin_ACC, HIGH);
   digitalWrite(pin_ENGINE, HIGH);
   digitalWrite(pin_START, HIGH);
+  Serial.println("relay off");
 }
 
-void engine_off() {
+String engine_off() {
   // глушим двигатель
   digitalWrite(pin_ENGINE, HIGH);
   delay(50);
   digitalWrite(pin_ACC, HIGH);
-  is_started = false;
+  return "switched off";
 }
 
 float get_time_val() {
@@ -46,18 +48,17 @@ float get_time_val() {
   temp = dht.readTemperature();
   Serial.print("Temerature ");
   Serial.println(temp);
-  if (temp >= 5) {
-    time_value = 1.5;
-  } else if (temp < -10) {
-    time_value = 2.5;
-  } else {
-    time_value = 2.0;
+  if (temp >= 5) {                  // температуры выше +5 - время 1.5 сек
+    return 1.5;
+  } else if (temp < -10) {          // температура меньше -10 - время 2.5 сек
+    return 2.5;
+  } else {                          // температуры от -10 до +4 - время 2 сек
+    return 2.0;
   }
-  return time_value;
 }
 
-bool engine_start(float time_val) {
-  if (is_started != true) {
+String engine_start(float time_val) {
+  if (engine_status != "engine-running") {
     int count = 0;
     Serial.println(time_val);
     digitalWrite(pin_ACC, LOW);
@@ -73,16 +74,16 @@ bool engine_start(float time_val) {
       Serial.println("trying to start");
       count++;
     }
+    delay(3000);
+    if (digitalRead(start_ok) == HIGH){
+      Serial.println("engine running");
+      return "engine running";
+    } else {
+      Serial.println("starting failed");
+      engine_off();
+      return "starting failed";
+    }
   }
-  if (digitalRead(start_ok) == HIGH) {
-    is_started = true;
-    Serial.println("engine started");
-    Sim800l.sendSms(tel, "Engine started");
-  } else {
-    Serial.println("Starting failed");
-    Sim800l.sendSms(tel, "Starting failed");
-  }
-  return is_started;
 }
 
 void setup() {
@@ -99,7 +100,7 @@ void setup() {
   relay_off();                                // реле управляются низким уровнем, подаем на них высокий, состояние - отключены
   Sim800l.delAllSms();
   Serial.println("All sms deleted");
-  attachInterrupt(2, engine_off, FALLING); ////////////////////
+  attachInterrupt(0, relay_off, FALLING); ////////////////////
   Serial.println("Ready");
 }
 
@@ -114,15 +115,12 @@ void loop() {
         Serial.println("this number!");
         textSms.toUpperCase();
         if (textSms.indexOf("\nSTART\r\n")!=-1) {
-          if (is_started != true) {
-            get_time_val();
-            engine_start(time_value);
-          } else {
-            Serial.println("already started");
-            Sim800l.sendSms(tel, "Already started");
-          }
+          time_value = get_time_val();
+          engine_status = engine_start(time_value);
+          Sim800l.sendSms(tel, engine_status);
         } else if (textSms.indexOf("\nSTOP\r\n")!=-1) {
-          engine_off();
+          engine_status = engine_off();
+          Sim800l.sendSms(tel, engine_status);
           Serial.println("engine off");
         } else {
           Serial.println("wrong phrase");
@@ -136,10 +134,9 @@ void loop() {
     last_time = millis();
     Serial.println("end check sms");
   }
-  enc.tick(); // удалить строки, попробовать прерывания
-  if (enc.hasClicks()) {
-    engine_off();
-    isstarted = false;
-    Serial.println("engine off");
-  }
+//  enc.tick(); // удалить строки, попробовать прерывания
+//  if (enc.hasClicks()) {
+//    engine_off();
+//    Serial.println("engine off");
+//  }
 }
