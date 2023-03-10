@@ -55,11 +55,10 @@ bool gas_alarm = false;                                       // состоян�
 unsigned long last_time_gas = 0;
 unsigned long last_time_water = 0;
 unsigned long last_time_pik = 0;
-unsigned long last_time_batt_request = 0;
+unsigned long last_batt_val_request = 0;
 
-String battery_status;
-String txt;
-//String cmd = "AT+CBC";
+String bat;
+
 
 void clear_string(int row) {                                  // функция очищает строку дисплея
   lcd.setCursor(0, row);
@@ -82,7 +81,7 @@ void alarm_test() {                                           // тест сиг
   clear_string(1);
   if (sent) {                                                 // если модуль отослал СМС то пишем на экране результат
     lcd.setCursor(0, 1);
-    lcd.print("    SMS OK");
+    lcd.print("   SMS SENT");
   } else {
     lcd.setCursor(0, 1);
     lcd.print("  SMS ERROR");
@@ -215,9 +214,19 @@ void alarm_off() {                                             // отключа
 }
 
 
-/****************************************************************************************************************/
+/*******************************Запрос уровня заряда аккумулятора**********************************************/
 
-
+void batt_val_request() {                                       // АТ команда с запросом заряда аккумулятора
+  String cmd = Sim800l.sendATCommand("AT+CBC", true);
+  String txt = cmd.substring(cmd.indexOf(",") + 1, cmd.length());
+  bat = txt.toInt();
+  Serial.println("send at");                                    //////////////////////////
+  Serial.print(bat);                                            //////////////////////////
+  Serial.println("%");                                          //////////////////////////
+  lcd.setCursor(13, 1); 
+  lcd.print(bat);
+  lcd.print("%");
+}
 
 /************************************Основной цикл программы***************************************************/
 
@@ -236,18 +245,14 @@ void setup() {
   sim800_check();                                               // проверка связя с модулем GSM
   delay(2000);
   sensors_check();                                              // проверяем работу датчиков
-  //delay(2000);
-//  lcd.setCursor(0, 1);
-//  lcd.print("     Start");
-//  delay(2000);
   lcd.clear();                                                  // очищаем дисплей перед стартом
   //lcd.noBacklight();                                          // отключаем подсветку дисплея чтоб зря не светил
 }
 
 void loop() {
   if (gas_alarm) {
-    lcd.setCursor(15, 1);
-    lcd.print(char(255));                                  // если была тревога по газу, то рисуем символ в конце 2й строки  
+    lcd.setCursor(15, 0);
+    lcd.print(char(255));                                  // если была тревога по газу, то рисуем символ в конце 1й строки  
   }
   test_butt.tick();                                             // опрос кнопки
   if (test_butt.hasClicks(1)) {
@@ -260,24 +265,28 @@ void loop() {
     alarm_off();                                                // включает мониторинг зон
   }
   buzz_pik();                                                   // издает короткие звуковые сигналы если была тревога
+  if (!water_alarm && !gas_alarm && millis() - last_batt_val_request > 5000) {
+    batt_val_request();                                         // если нет тревоги, то выводим на экран процент заряда батареи
+    last_batt_val_request = millis();
+  }
   if (millis() - last_time_gas > 5000) {
-    Serial.println("scan GAS");
+    Serial.println("scan GAS");                                 //////////////////////////
     gas_scan();
     gas_view();
     if (!gas_alarm) {                  // если была обнаружена утечка мониторинг продолжается, но тревога больше не включается
       if (gas_sensor1 > limit_value || gas_sensor2 > limit_value || gas_sensor3 > limit_value) {
         alarm_gas();
-        Serial.println("gas alarm");
+        Serial.println("gas alarm");                            //////////////////////////
       }
     }
-    Serial.println("end scan GAS");                              //////////////////////////
+    Serial.println("end scan GAS");                             //////////////////////////
     last_time_gas = millis();
   }
   if (millis() - last_time_water > 1000) {                      // проверка зон на проткчку каждую секунду
-    Serial.println("Scan water");
+    Serial.println("Scan water");                               //////////////////////////
     if (!water_alarm) {                                         // при обнаружении протечки блок проверки зон пропускается
       lcd.setCursor(0, 1);
-      lcd.print("    Water OK");
+      lcd.print("  Water OK");
       if (digitalRead(kitchen) == HIGH) {
         alarm_water("Kitchen", "kitchen");
       }
