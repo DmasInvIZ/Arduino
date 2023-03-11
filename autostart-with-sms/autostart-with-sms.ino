@@ -12,7 +12,7 @@
 #define temp_sensor A0                        // датчик температуры
 #define tel "+375295689321"                   // реагируем на смс только с этого номера
 #define start_ok 12                           // на этот пин приходит сигнал запуска двигателя
-#define engine_start_try 3                    // попыток прокрутки стартера
+#define engine_start_try 3                    // попыток пуска двигателя
 
 EncButton<EB_TICK, BTN_PIN> enc;
 Sim800l Sim800l;
