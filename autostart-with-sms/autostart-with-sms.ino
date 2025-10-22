@@ -1,40 +1,35 @@
 #include <SoftwareSerial.h>
 #include <Sim800l.h>
 #include <EncButton.h>
-#include <DHT.h>
+
 
 #define BTN_PIN 2                             // кнопка остановки двигателя
-#define pin_ACC 4                             // первое положение ключа
 #define pin_ENGINE 5                          // зажигание
 #define pin_START 6                           // стартер
 #define pin_break                             // ручной тормоз
 #define pin_neutral                           // коробка передач, нейтраль
-#define temp_sensor A0                        // датчик температуры
 #define tel "+375295689321"                   // реагируем на смс только с этого номера
-#define start_ok 12                           // на этот пин приходит сигнал запуска двигателя
-#define engine_start_try 3                    // попыток пуска двигателя
+#define start_ok_pin 12                           // на этот пин приходит сигнал запуска двигателя
 
 EncButton<EB_TICK, BTN_PIN> enc;
 Sim800l Sim800l;
 SoftwareSerial SIM800(8, 9);                  // 8 - RX Arduino (TX SIM800L), 9 - TX Arduino (RX SIM800L)
-DHT dht(temp_sensor, DHT11);                  // иниациалзация датчика температуры
 
 String textSms, numberSms;                    // текст смс и номер абонента
 volatile bool isstarted; ////////////////////////
 unsigned long last_time;
-float temp, time_value;
 String engine_status;                         // статус двигателя: switched-off - выключен
-                                              // engine-running - запущен
-                                              // starting-failed - запуск не удался
+                                              //                   engine-running - запущен
+                                              //                   starting-failed - запуск не удался
 
 void relay_off() {
   // реле управляется низким уровнем, при включении МК подаем высокий сигнал на пины
-  digitalWrite(pin_ACC, HIGH);
   digitalWrite(pin_ENGINE, HIGH);
   digitalWrite(pin_START, HIGH);
   Serial.println("relay off");
 }
 
+/*
 String engine_off() {
   // глушим двигатель
   digitalWrite(pin_ENGINE, HIGH);
@@ -42,21 +37,9 @@ String engine_off() {
   digitalWrite(pin_ACC, HIGH);
   return "switched off";
 }
+*/
 
-float get_time_val() {
-  //измеряет температуру, возвращает время вращения стартера
-  temp = dht.readTemperature();
-  Serial.print("Temerature ");
-  Serial.println(temp);
-  if (temp >= 5) {                  // температуры выше +5 - время 1.5 сек
-    return 1.5;
-  } else if (temp < -10) {          // температура меньше -10 - время 2.5 сек
-    return 2.5;
-  } else {                          // температуры от -10 до +4 - время 2 сек
-    return 2.0;
-  }
-}
-
+/*
 String engine_start(float time_val) {
   if (engine_status != "engine-running") {
     int count = 0;
@@ -85,6 +68,52 @@ String engine_start(float time_val) {
     }
   }
 }
+*/
+
+//включает зажигание
+void ignition_on() {
+  digitalWrite(pin_ENGINE, LOW);
+}
+
+//выключает зажигание
+void ignition_off() {
+  digitalWrite(pin_ENGINE, HIGH);
+}
+
+//включает стартер
+void starter_on() {
+  digitalWrite(pin_START, LOW);
+}
+
+//выключает стартер
+void starter_off() {
+  digitalWrite(pin_START, HIGH);
+}
+
+//проверяет запущен ли двигатель
+bool staus_checking (){
+  return digitalRead(start_ok_pin);
+}
+
+//запускает двигатель
+String engine_start() {
+  if (engine_status = "engine-running") {
+    return engine_status;
+  }
+  ignition_on();
+  delay(2000):
+  int starter_counter;
+  
+  while (starter_counter < 4) {
+    unsigned long starting_time = millis();
+    starter_on();
+    if millis() - starting_time > 3000 {
+      starter_off();
+    }
+    
+    starter_counter ++;
+  }
+}
 
 void setup() {
   Serial.begin(9600);                         // Инициализация последовательной связи с Arduino и Arduino IDE (Serial Monitor)
@@ -92,7 +121,6 @@ void setup() {
   SIM800.begin(9600);                         // Инициализация последовательной связи с Arduino и SIM800L
   SIM800.println("AT");
   Sim800l.begin();                            // Инициализация модема
-  dht.begin();
   pinMode(BTN_PIN, INPUT_PULLUP);
   pinMode(pin_ACC, OUTPUT);
   pinMode(pin_ENGINE, OUTPUT);
@@ -115,8 +143,7 @@ void loop() {
         Serial.println("this number!");
         textSms.toUpperCase();
         if (textSms.indexOf("\nSTART\r\n")!=-1) {
-          time_value = get_time_val();
-          engine_status = engine_start(time_value);
+          engine_status = engine_start();
           Sim800l.sendSms(tel, engine_status);
         } else if (textSms.indexOf("\nSTOP\r\n")!=-1) {
           engine_status = engine_off();
