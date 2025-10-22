@@ -49,10 +49,34 @@ void starter_off() {
   digitalWrite(pin_START, HIGH);
 }
 
-//выключает двигатель
+// Функция выключения двигателя
+// ----------------------------------
 String engine_off() {
+  Serial.println("[REQUEST] Engine OFF sequence initiated...");
+
+  if (engine_status != "engine-running") {
+    Serial.println("[INFO] Engine already OFF. No action taken.");
+    return engine_status = "switched-off";
+  }
+
+  starter_off();   // на всякий случай
   ignition_off();
-  return engine_status = "switched-off";
+
+  Serial.println("[ACTION] Ignition OFF. Waiting for engine to stop...");
+
+  unsigned long timeout = millis();
+  while (millis() - timeout < 3000) { // ждём до 3 секунд подтверждения остановки
+    if (digitalRead(start_ok_pin) == LOW) {
+      engine_status = "switched-off";
+      Serial.println("[SUCCESS] Engine stopped successfully.");
+      return engine_status;
+    }
+    delay(100);
+  }
+
+  engine_status = "stop-failed";
+  Serial.println("[ERROR] Engine stop timeout reached, engine still running!");
+  return engine_status;
 }
 
 //проверяет запущен ли двигатель
@@ -145,7 +169,15 @@ void setup() {
 
 void loop() {
 
-  
+  // обновляем состояние энкодера/кнопки
+  enc.tick();
+
+  // если кнопка нажата — пробуем выключить двигатель
+  if (enc.press()) {
+    Serial.println("[INPUT] Engine OFF button pressed!");
+    engine_off();
+  }
+
   
   /*
   if (millis() - last_time > 5000) {
