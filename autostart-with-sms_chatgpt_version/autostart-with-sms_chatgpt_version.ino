@@ -6,8 +6,8 @@
 #define BTN_PIN 3                             // кнопка остановки двигателя
 #define pin_ENGINE 5                          // зажигание
 #define pin_START 6                           // стартер
-#define pin_break                             // ручной тормоз
-#define pin_neutral                           // коробка передач, нейтраль
+//#define pin_break                             // ручной тормоз
+//#define pin_neutral                           // коробка передач, нейтраль
 #define tel "+375295689321"                   // реагируем на смс только с этого номера
 #define start_ok_pin 12                       // на этот пин приходит сигнал запуска двигателя
 
@@ -16,7 +16,6 @@ Sim800l Sim800l;
 SoftwareSerial SIM800(8, 9);                  // 8 - RX Arduino (TX SIM800L), 9 - TX Arduino (RX SIM800L)
 
 String textSms, numberSms;                    // текст смс и номер абонента
-volatile bool isstarted; ////////////////////////
 unsigned long last_time;
 String engine_status;                         // статус двигателя: switched-off - выключен
                                               //                   engine-running - запущен
@@ -80,14 +79,15 @@ String engine_off() {
 }
 
 //проверяет запущен ли двигатель
-bool staus_checking (){
+bool status_checking(){
   return digitalRead(start_ok_pin);
 }
 
 //запускает двигатель
 String engine_start() {
   // Если двигатель уже работает — выходим сразу
-  if (engine_status == "engine-running") {
+  bool engine = status_checking();
+  if (engine) {
     Serial.println("[INFO] Engine already running, no action needed.");
     return engine_status;
   }
@@ -153,22 +153,22 @@ String engine_start() {
 void setup() {
   Serial.begin(9600);                         // Инициализация последовательной связи с Arduino и Arduino IDE (Serial Monitor)
   Serial.println("Loading...");
-  //SIM800.begin(9600);                         // Инициализация последовательной связи с Arduino и SIM800L
-  //SIM800.println("AT");
-  //Sim800l.begin();                            // Инициализация модема
+  SIM800.begin(9600);                         // Инициализация последовательной связи с Arduino и SIM800L
+  SIM800.println("AT");
+  Sim800l.begin();                            // Инициализация модема
   pinMode(BTN_PIN, INPUT_PULLUP);
+  pinMode(start_ok_pin, INPUT);               // ПОДТЯНУТЬ ПИН К ЗЕМЛЕ
   pinMode(pin_ENGINE, OUTPUT);
   pinMode(pin_START, OUTPUT);
   relay_off();                                // реле управляются низким уровнем, подаем на них высокий, состояние - отключены
-  //Sim800l.delAllSms();
+  Sim800l.delAllSms();
   Serial.println("All sms deleted");
   Serial.println("Ready");
 
-  engine_start();
+  //engine_start(); //for testing
 }
 
 void loop() {
-
   // обновляем состояние энкодера/кнопки
   enc.tick();
 
@@ -177,10 +177,8 @@ void loop() {
     Serial.println("[INPUT] Engine OFF button pressed!");
     engine_off();
   }
-
   
-  /*
-  if (millis() - last_time > 5000) {
+  if (millis() - last_time > 10000) {
     Serial.println("check sms");
     textSms=Sim800l.readSms(1);
     if (textSms.indexOf("OK")!=-1) {
@@ -191,9 +189,11 @@ void loop() {
         textSms.toUpperCase();
         if (textSms.indexOf("\nSTART\r\n")!=-1) {
           engine_status = engine_start();
+          delay(5000);
           Sim800l.sendSms(tel, engine_status);
         } else if (textSms.indexOf("\nSTOP\r\n")!=-1) {
           engine_status = engine_off();
+          delay(5000);
           Sim800l.sendSms(tel, engine_status);
           Serial.println("engine off");
         } else {
@@ -208,5 +208,4 @@ void loop() {
     last_time = millis();
     Serial.println("end check sms");
   }
-  */
 }
